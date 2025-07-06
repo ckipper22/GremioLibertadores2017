@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grêmio - Campanha Libertadores 2017</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Grêmio Tricolor (Blue, Black, White) with Gold Accent -->
+    <!-- Application Structure Plan: A dashboard-style single-page application. The structure starts with high-level summary cards (title, wins, goals). The main content is organized into six logical tabs: 1) 'A Campanha' - an interactive chronological timeline of all matches, with clickable cards to reveal detailed stats in a modal, 2) 'Visão Geral' - a section with charts visualizing key performance indicators like home/away results and goals per stage, 3) 'Artilheiros' - a clean display of top scorers, 4) 'Titulares e Suspensões' - a section detailing player starts, substitutions, and suspensions, 5) 'Minutos Jogados' - a section showing total minutes played by each player, and 6) 'Cartões por Jogador' - a section detailing yellow and red cards received by each player. This tabbed structure was chosen to segment the rich data from the report into digestible, user-driven sections, preventing information overload and allowing users to explore what interests them most, rather than forcing a linear progression like the source report. -->
+    <!-- Visualization & Content Choices: 
+        - Report Info: Overall campaign result -> Goal: Inform -> Viz/Presentation: Title & Key Stat Cards (HTML/Tailwind) -> Interaction: None -> Justification: Provides immediate, high-impact summary.
+        - Chronological matches -> Goal: Organize/Explore -> Viz/Presentation: Interactive Timeline with Cards (HTML/CSS + JS) -> Interaction: Click card to open modal with detailed data (goals, cards) -> Justification: Organizes all 14 matches cleanly, offering deep detail on demand without cluttering the main view.
+        - Home vs. Away Performance -> Goal: Compare -> Viz/Presentation: Stacked Bar Chart (Chart.js/Canvas) -> Interaction: Hover tooltips -> Justification: Visually quantifies the significant performance difference between home and away games, a key insight from the report.
+        - Goals Scored/Conceded per Stage -> Goal: Analyze Change -> Viz/Presentation: Grouped Bar Chart (Chart.js/Canvas) -> Interaction: Hover tooltips -> Justification: Shows the team's offensive/defensive trends as the competition's stakes increased.
+        - Top Goalscorers -> Goal: Inform -> Viz/Presentation: Styled List/Cards (HTML/Tailwind) -> Interaction: None -> Justification: Clearly highlights the key individual contributors to the campaign's success.
+        - Disciplinary Record -> Goal: Inform -> Viz/Presentation: Key Stat Cards (HTML/Tailwind) -> Interaction: None -> Justification: Summarizes the disciplinary aspect mentioned in the report concisely.
+        - Player Starts, Subs and Suspensions -> Goal: Inform/Organize -> Viz/Presentation: Tables (HTML/Tailwind + JS) -> Interaction: Click player name to open modal with detailed match participation and suspension history -> Justification: Provides detailed player-centric data on participation and disciplinary impact, now with drill-down capability for specific match context.
+        - Minutes Played -> Goal: Inform/Quantify -> Viz/Presentation: Table (HTML/Tailwind + JS) -> Interaction: Click player name to open modal with detailed match participation and suspension history (reusing existing modal) -> Justification: Quantifies player contribution by time on field, adding another dimension to player analysis.
+        - Cards per Player -> Goal: Inform/Quantify -> Viz/Presentation: Table (HTML/Tailwind + JS) -> Interaction: Click player name to open modal with detailed card history -> Justification: Provides a clear overview of individual disciplinary records.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f2f5;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 400px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
+        }
+        .tab-button.active {
+            border-color: #1e40af;
+            background-color: #dbeafe;
+            color: #1e3a8a;
+            font-weight: 600;
+        }
+        .modal {
+            transition: opacity 0.25s ease;
+        }
+        .player-name-link {
+            cursor: pointer;
+            color: #2563eb;
+            text-decoration: underline;
+        }
+        .player-name-link:hover {
+            color: #1e40af;
+        }
+    </style>
+</head>
+<body class="text-gray-800">
+
+    <div class="container mx-auto p-4 md:p-8">
+        
+        <header class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-blue-900">Grêmio: A Jornada do Tri da América 2017</h1>
+            <p class="text-gray-600 mt-2">Uma análise interativa da campanha vitoriosa na Copa Libertadores.</p>
+        </header>
+
+        <section id="key-stats" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <div class="bg-white p-4 rounded-lg shadow text-center">
+                <h3 class="text-sm font-semibold text-gray-500">Resultado</h3>
+                <p class="text-2xl font-bold text-amber-500">🏆 Campeão</p>
+            </div>
+            <div class="bg-white p-4 rounded-lg shadow text-center">
+                <h3 class="text-sm font-semibold text-gray-500">Partidas</h3>
+                <p class="text-2xl font-bold text-blue-900">14</p>
+            </div>
+            <div class="bg-white p-4 rounded-lg shadow text-center">
+                <h3 class="text-sm font-semibold text-gray-500">Vitórias</h3>
+                <p class="text-2xl font-bold text-green-600">10</p>
+            </div>
+            <div class="bg-white p-4 rounded-lg shadow text-center">
+                <h3 class="text-sm font-semibold text-gray-500">Gols Marcados</h3>
+                <p class="text-2xl font-bold text-blue-900">29</p>
+            </div>
+        </section>
+
+        <main class="bg-white rounded-lg shadow p-4 md:p-6">
+            <div class="border-b border-gray-200 mb-6">
+                <nav class="flex flex-wrap -mb-px" id="tabs">
+                    <button data-tab="campanha" class="tab-button active text-gray-600 py-4 px-6 block hover:text-blue-700 focus:outline-none border-b-2 font-medium">
+                        A Campanha
+                    </button>
+                    <button data-tab="visao-geral" class="tab-button text-gray-600 py-4 px-6 block hover:text-blue-700 focus:outline-none border-b-2 font-medium">
+                        Visão Geral
+                    </button>
+                    <button data-tab="artilheiros" class="tab-button text-gray-600 py-4 px-6 block hover:text-blue-700 focus:outline-none border-b-2 font-medium">
+                        Artilheiros
+                    </button>
+                    <button data-tab="titulares" class="tab-button text-gray-600 py-4 px-6 block hover:text-blue-700 focus:outline-none border-b-2 font-medium">
+                        Titulares e Suspensões
+                    </button>
+                    <button data-tab="minutos-jogados" class="tab-button text-gray-600 py-4 px-6 block hover:text-blue-700 focus:outline-none border-b-2 font-medium">
+                        Minutos Jogados
+                    </button>
+                    <button data-tab="cartoes-jogador" class="tab-button text-gray-600 py-4 px-6 block hover:text-blue-700 focus:outline-none border-b-2 font-medium">
+                        Cartões por Jogador
+                    </button>
+                </nav>
+            </div>
+            
+            <div id="tab-content">
+                <div id="campanha-content" class="tab-pane active">
+                    <p class="text-gray-600 mb-6 text-center">Navegue pela linha do tempo completa da campanha do Grêmio. Clique em cada partida para ver os detalhes completos, incluindo gols, cartões e substituições.</p>
+                    <div id="timeline" class="space-y-4"></div>
+                </div>
+                <div id="visao-geral-content" class="tab-pane hidden">
+                     <p class="text-gray-600 mb-8 text-center">Explore os dados da campanha através de gráficos interativos. Esta seção visualiza o desempenho do time em casa e fora, a performance ofensiva e defensiva ao longo das fases e o registro disciplinar.</p>
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <h3 class="text-lg font-semibold text-center mb-4">Resultados: Casa vs. Fora</h3>
+                            <div class="chart-container"><canvas id="homeAwayChart"></canvas></div>
+                        </div>
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <h3 class="text-lg font-semibold text-center mb-4">Gols por Fase do Torneio</h3>
+                            <div class="chart-container"><canvas id="goalsByStageChart"></canvas></div>
+                        </div>
+                    </div>
+                </div>
+                <div id="artilheiros-content" class="tab-pane hidden">
+                    <p class="text-gray-600 mb-6 text-center">Conheça os goleadores do Grêmio na campanha da Libertadores 2017. Estes jogadores foram decisivos para a conquista do tricampeonato.</p>
+                    <div id="scorers-list" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 text-center"></div>
+                </div>
+                <div id="titulares-content" class="tab-pane hidden">
+                    <p class="text-gray-600 mb-6 text-center">Visualize a participação dos jogadores como titulares e reservas, e as ocorrências de suspensões por cartão vermelho ao longo da campanha. Clique no nome do jogador para ver detalhes.</p>
+                    <!-- Content will be rendered by JavaScript -->
+                </div>
+                <div id="minutos-jogados-content" class="tab-pane hidden">
+                    <p class="text-gray-600 mb-6 text-center">Veja o total de minutos jogados por cada atleta na campanha da Libertadores 2017. Clique no nome do jogador para ver detalhes de participação.</p>
+                    <!-- Content will be rendered by JavaScript -->
+                </div>
+                <div id="cartoes-jogador-content" class="tab-pane hidden">
+                    <p class="text-gray-600 mb-6 text-center">Veja o total de cartões amarelos e vermelhos recebidos por cada jogador. Clique no nome do jogador para ver detalhes.</p>
+                    <!-- Content will be rendered by JavaScript -->
+                </div>
+            </div>
+        </main>
+
+    </div>
+
+    <div id="match-modal" class="modal fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden z-50">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div class="p-6">
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <h2 id="modal-title" class="text-xl md:text-2xl font-bold text-blue-900"></h2>
+                        <p id="modal-subtitle" class="text-sm text-gray-500"></p>
+                    </div>
+                    <button id="close-modal" class="text-gray-500 hover:text-red-600 text-3xl font-bold">&times;</button>
+                </div>
+                <div id="modal-content" class="space-y-4"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const matchData = [
+            {
+                date: '09/03/2017', homeTeam: 'Zamora', awayTeam: 'Grêmio', score: '0 x 2', location: 'Estádio La Carolina (Barinas)', stage: 'Fase de Grupos', type: 'away',
+                gremioGoals: [{ player: "Léo Moura", minute: "45'" }, { player: "Luan", minute: "51' (pen)" }],
+                opponentGoals: [],
+                gremioYellow: [], gremioRed: [],
+                opponentYellow: [{ player: "Luis Ovalle", minute: "50'" }, { player: "Luis Vargas", minute: "53'" }], opponentRed: [],
+                substitutions: [{ playerIn: "Lucas Barrios", playerOut: "Luan", minute: "71'" }, { playerIn: "Everton", playerOut: "Pedro Rocha", minute: "71'" }, { playerIn: "Fernandinho", playerOut: "Bolaños", minute: "83'" }],
+                startingXI: ["Marcelo Grohe", "Léo Moura", "Pedro Geromel", "Walter Kannemann", "Marcelo Oliveira", "Maicon", "Arthur", "Ramiro", "Luan", "Bolaños", "Pedro Rocha"],
+                suspendedForThisMatch: []
+            },
+            {
+                date: '11/04/2017', homeTeam: 'Grêmio', awayTeam: 'Deportes Iquique', score: '3 x 2', location: 'Arena do Grêmio (Porto Alegre)', stage: 'Fase de Grupos', type: 'home',
+                gremioGoals: [{ player: "Luan", minute: "15'" }, { player: "Luan", minute: "23'" }, { player: "Bolaños", minute: "28' (pen)" }],
+                opponentGoals: [{ player: "Rafael Caroca", minute: "60'" }, { player: "Misael D'ávila", minute: "67'" }],
+                gremioYellow: [{ player: "Marcelo Oliveira", minute: "41'" }, { player: "Ramiro", minute: "81'" }, { player: "Bolaños", minute: "68'" }], gremioRed: [],
+                opponentYellow: [{ player: "Lópes", minute: "66'" }, { player: "Mauricio Zenteno", minute: "68'" }, { player: "Rafael Caroca", minute: "71'" }, { player: "Tomás Charles", minute: "78'" }, { player: "Gonzalo Bustamante", minute: "90+3'" }], opponentRed: [],
+                substitutions: [{'playerIn': "Michel", 'playerOut': "Léo Moura", 'minute': "56'"}, {'playerIn': "Fernandinho", 'playerOut': "Maicon", 'minute': "68'"}, {'playerIn': "Lucas Barrios", 'playerOut': "Bolaños", 'minute': "79'"}],
+                // Corrected startingXI based on the provided image
+                startingXI: ["Marcelo Grohe", "Edílson", "Thyere", "Walter Kannemann", "Marcelo Oliveira", "Maicon", "Ramiro", "Léo Moura", "Bolaños", "Pedro Rocha", "Luan"],
+                suspendedForThisMatch: []
+            },
+            {
+                date: '20/04/2017', homeTeam: 'Guaraní-PAR', awayTeam: 'Grêmio', score: '1 x 1', location: 'Defensores del Chaco', stage: 'Fase de Grupos', type: 'away',
+                gremioGoals: [{ player: "Pedro Rocha", minute: "79'" }],
+                opponentGoals: [{ player: "Rodrigo López", minute: "58'" }],
+                gremioYellow: [], gremioRed: [], opponentYellow: [], opponentRed: [], substitutions: [],
+                startingXI: ["Marcelo Grohe", "Léo Moura", "Pedro Geromel", "Walter Kannemann", "Marcelo Oliveira", "Michel", "Arthur", "Ramiro", "Luan", "Lucas Barrios", "Pedro Rocha"],
+                suspendedForThisMatch: []
+            },
+            {
+                date: '27/04/2017', homeTeam: 'Grêmio', awayTeam: 'Guaraní-PAR', score: '4 x 1', location: 'Arena do Grêmio (Porto Alegre)', stage: 'Fase de Grupos', type: 'home',
+                gremioGoals: [{ player: "Lucas Barrios", minute: "7'" }, { player: "Lucas Barrios", minute: "28'" }, { player: "Lucas Barrios", minute: "76'" }, { player: "Pedro Geromel", minute: "45+3'" }],
+                opponentGoals: [{ player: "Léo Moura", minute: "34' (GC)" }],
+                gremioYellow: [{ player: "Lucas Barrios", minute: "45'" }, { player: "Arthur", minute: "45'" }], gremioRed: [],
+                opponentYellow: [{ player: "Tomás Bartomeús", minute: "42'" }, { player: "Wilson Pittoni", minute: "44'" }], opponentRed: [{ player: "Néstor Camacho", minute: "45'" }],
+                substitutions: [{ playerIn: "Arthur", playerOut: "Bolaños", minute: "13'" }, { playerIn: "Lincoln", playerOut: "Luan", minute: "71'" }, { playerIn: "Everton", playerOut: "Lucas Barrios", minute: "79'" }],
+                startingXI: ["Marcelo Grohe", "Léo Moura", "Pedro Geromel", "Walter Kannemann", "Marcelo Oliveira", "Michel", "Arthur", "Ramiro", "Luan", "Lucas Barrios", "Bolaños"],
+                suspendedForThisMatch: []
+            },
+            {
+                date: '03/05/2017', homeTeam: 'Deportes Iquique', awayTeam: 'Grêmio', score: '2 x 1', location: 'Zorros del Deserto (Calama)', stage: 'Fase de Grupos', type: 'away',
+                gremioGoals: [{ player: "Lucas Barrios", minute: "19'" }],
+                opponentGoals: [{ player: "Diego Bielkiewicz", minute: "23' (pen)" }, { player: "Diego Torres", minute: "49'" }],
+                gremioYellow: [{ player: "Walter Kannemann", minute: "26'" }, { player: "Pedro Rocha", minute: "48'" }, { player: "Pedro Geromel", minute: "68'" }, { player: "Marcelo Grohe", minute: "90'" }], gremioRed: [{ player: "Ramiro", minute: "90'" }],
+                opponentYellow: [{ player: "Alan Moreno", minute: "54'" }, { player: "Diego Torres", minute: "83'" }], opponentRed: [],
+                substitutions: [{ playerIn: "Fernandinho", playerOut: "Jaílson", minute: "55'" }, { playerIn: "Arthur", playerOut: "Pedro Rocha", minute: "65'" }, { playerIn: "Everton", playerOut: "Michel", minute: "86'" }],
+                startingXI: ["Marcelo Grohe", "Léo Moura", "Pedro Geromel", "Walter Kannemann", "Marcelo Oliveira", "Jaílson", "Michel", "Ramiro", "Luan", "Lucas Barrios", "Pedro Rocha"],
+                suspendedForThisMatch: []
+            },
+            {
+                date: '25/05/2017', homeTeam: 'Grêmio', awayTeam: 'Zamora', score: '4 x 0', location: 'Arena do Grêmio (Porto Alegre)', stage: 'Fase de Grupos', type: 'home',
+                gremioGoals: [{ player: "Luan", minute: "22'" }, { player: "Luan", minute: "28' (pen)" }, { player: "Lucas Barrios", minute: "25'" }, { player: "Pedro Rocha", minute: "63'" }],
+                opponentGoals: [],
+                gremioYellow: [{ player: "Walter Kannemann", minute: "" }, { player: "Bruno Cortez", minute: "" }], gremioRed: [],
+                opponentYellow: [{ player: "Óscar Hernández", minute: "47'" }, { player: "José Pinto", minute: "79'" }], opponentRed: [],
+                substitutions: [{ playerIn: "Fernandinho", playerOut: "Arthur", minute: "71'" }, { playerIn: "Léo Gomes", playerOut: "Léo Moura", minute: "79'" }, { playerIn: "Everton", playerOut: "Gastón Fernández", minute: "79'" }],
+                startingXI: ["Marcelo Grohe", "Léo Moura", "Pedro Geromel", "Walter Kannemann", "Bruno Cortez", "Arthur", "Michel", "Luan", "Lucas Barrios", "Pedro Rocha", "Gastón Fernández"],
+                suspendedForThisMatch: ["Ramiro"] // Ramiro suspended from previous match
+            },
+            {
+                date: '04/07/2017', homeTeam: 'Godoy Cruz', awayTeam: 'Grêmio', score: '0 x 1', location: 'Malvinas Argentinas (Mendoza)', stage: 'Oitavas de Final', type: 'away',
+                gremioGoals: [{ player: "Ramiro", minute: "1'" }],
+                opponentGoals: [],
+                gremioYellow: [{ player: "Marcelo Grohe", minute: "38'" }], gremioRed: [],
+                opponentYellow: [{ player: "Luciano Abencasis", minute: "12'" }, { player: "Fabián Henríquez", minute: "18'" }, { player: "Ángel González", minute: "16'" }, { player: "Correa", minute: "84'" }], opponentRed: [],
+                substitutions: [{ playerIn: "Everton", playerOut: "Pedro Rocha", minute: "65'" }, { playerIn: "Fernandinho", playerOut: "Lucas Barrios", minute: "72'" }, { playerIn: "Jaílson", playerOut: "Arthur", minute: "81'" }],
+                startingXI: ["Marcelo Grohe", "Edílson", "Pedro Geromel", "Walter Kannemann", "Bruno Cortez", "Arthur", "Michel", "Ramiro", "Luan", "Lucas Barrios", "Pedro Rocha"],
+                suspendedForThisMatch: []
+            },
+            {
+                date: '09/08/2017', homeTeam: 'Grêmio', awayTeam: 'Godoy Cruz', score: '2 x 1', location: 'Arena do Grêmio (Porto Alegre)', stage: 'Oitavas de Final', type: 'home',
+                gremioGoals: [{ player: "Pedro Rocha", minute: "28'" }, { player: "Pedro Rocha", minute: "57'" }],
+                opponentGoals: [{ player: "Javier Correa", minute: "15'" }],
+                gremioYellow: [{ player: "Michel", minute: "41'" }, { player: "Maicon", minute: "57'" }, { player: "Fernandinho", minute: "87'" }], gremioRed: [{ player: "Michel", minute: "90'" }],
+                opponentYellow: [{ player: "Luciano Abencasis", minute: "24'" }, { player: "Leonel Galeano", minute: "38'" }, { player: "Fabián Henríquez", minute: "52'" }, { player: "Sebastián Olivarez", minute: "86'" }], opponentRed: [],
+                substitutions: [{ playerIn: "Arthur", playerOut: "Michel", minute: "74'" }, { playerIn: "Fernandinho", playerOut: "Ramiro", minute: "76'" }, { playerIn: "Marcelo Oliveira", playerOut: "Pedro Rocha", minute: "85'" }],
+                startingXI: ["Marcelo Grohe", "Edílson", "Pedro Geromel", "Walter Kannemann", "Bruno Cortez", "Maicon", "Michel", "Ramiro", "Luan", "Lucas Barrios", "Pedro Rocha"],
+                suspendedForThisMatch: []
+            },
+            {
+                date: '13/09/2017', homeTeam: 'Botafogo', awayTeam: 'Grêmio', score: '0 x 0', location: 'Nilton Santos (Rio de Janeiro)', stage: 'Quartas de Final', type: 'away',
+                gremioGoals: [], opponentGoals: [], gremioYellow: [], gremioRed: [],
+                opponentYellow: [{ player: "Matheus Fernandes", minute: "80'" }, { player: "Rodrigo Pimpão", minute: "43'" }], opponentRed: [],
+                substitutions: [{ playerIn: "Everton", playerOut: "Lucas Barrios", minute: "60'" }, { playerIn: "Thyere", playerOut: "Léo Moura", minute: "88'" }],
+                startingXI: ["Marcelo Grohe", "Léo Moura", "Pedro Geromel", "Walter Kannemann", "Bruno Cortez", "Arthur", "Ramiro", "Luan", "Lucas Barrios", "Pedro Rocha", "Fernandinho"],
+                suspendedForThisMatch: ["Michel"] // Michel suspended from previous match
+            },
+            {
+                date: '20/09/2017', homeTeam: 'Grêmio', awayTeam: 'Botafogo', score: '1 x 0', location: 'Arena do Grêmio (Porto Alegre)', stage: 'Quartas de Final', type: 'home',
+                gremioGoals: [{ player: "Lucas Barrios", minute: "62'" }],
+                opponentGoals: [],
+                gremioYellow: [{ player: "Pedro Geromel", minute: "31'" }, { player: "Walter Kannemann", minute: "71'" }, { player: "Bruno Cortez", minute: "79'" }, { player: "Edílson", minute: "90+4'" }], gremioRed: [],
+                opponentYellow: [{ player: "Igor Rabello", minute: "26'" }, { player: "João Paulo", minute: "35'" }, { player: "Rodrigo Lindoso", minute: "67'" }, { player: "Roger", minute: "71'" }, { player: "Guilherme", minute: "90+4'" }], opponentRed: [],
+                substitutions: [{ playerIn: "Everton", playerOut: "Léo Moura", minute: "36'" }, { playerIn: "Jaílson", playerOut: "Lucas Barrios", minute: "80'" }, { playerIn: "Luan", playerOut: "Ramiro", minute: "89'" }],
+                startingXI: ["Marcelo Grohe", "Edílson", "Pedro Geromel", "Walter Kannemann", "Bruno Cortez", "Arthur", "Ramiro", "Luan", "Lucas Barrios", "Pedro Rocha", "Fernandinho"],
+                suspendedForThisMatch: []
+            },
+            {
+                date: '25/10/2017', homeTeam: 'Barcelona-EQU', awayTeam: 'Grêmio', score: '0 x 3', location: 'Monumental (Guayaquil)', stage: 'Semifinal', type: 'away',
+                gremioGoals: [{ player: "Luan", minute: "7'" }, { player: "Luan", minute: "50'" }, { player: "Edílson", minute: "20'" }],
+                opponentGoals: [],
+                gremioYellow: [{ player: "Lucas Barrios", minute: "42'" }], gremioRed: [],
+                opponentYellow: [{ player: "Caicedo", minute: "62'" }], opponentRed: [],
+                substitutions: [{ playerIn: "Léo Moura", playerOut: "Edílson", minute: "58'" }, { playerIn: "Michel", playerOut: "Jaílson", minute: "77'" }, { playerIn: "Cícero", playerOut: "Lucas Barrios", minute: "80'" }],
+                startingXI: ["Marcelo Grohe", "Edílson", "Pedro Geromel", "Walter Kannemann", "Bruno Cortez", "Arthur", "Jaílson", "Ramiro", "Luan", "Lucas Barrios", "Pedro Rocha"],
+                suspendedForThisMatch: []
+            },
+            {
+                date: '01/11/2017', homeTeam: 'Grêmio', awayTeam: 'Barcelona-EQU', score: '0 x 1', location: 'Arena do Grêmio (Porto Alegre)', stage: 'Semifinal', type: 'home',
+                gremioGoals: [],
+                opponentGoals: [{ player: "Jonatan Álvez", minute: "33'" }],
+                gremioYellow: [{ player: "Edílson", minute: "57'" }, { player: "Walter Kannemann", minute: "76'" }], gremioRed: [],
+                opponentYellow: [{ player: "Ely Esterilla", minute: "26'" }, { player: "Xavier Arreaga", minute: "76'" }, { player: "Matías Oyola", minute: "88'" }, { player: "Pedro Velasco", minute: "89'" }], opponentRed: [{ player: "Jonatan Álvez", minute: "90+5'" }],
+                substitutions: [{ playerIn: "Everton", playerOut: "Fernandinho", minute: "55'" }, { playerIn: "Jael", playerOut: "Cícero", minute: "69'" }, { playerIn: "Michel", playerOut: "Ramiro", minute: "83'" }],
+                startingXI: ["Marcelo Grohe", "Edílson", "Pedro Geromel", "Walter Kannemann", "Bruno Cortez", "Arthur", "Jaílson", "Ramiro", "Luan", "Lucas Barrios", "Fernandinho"],
+                suspendedForThisMatch: []
+            },
+            {
+                date: '22/11/2017', homeTeam: 'Grêmio', awayTeam: 'Lanús', score: '1 x 0', location: 'Arena do Grêmio (Porto Alegre)', stage: 'Final', type: 'home',
+                gremioGoals: [{ player: "Cícero", minute: "82'" }],
+                opponentGoals: [],
+                gremioYellow: [{ player: "Walter Kannemann", minute: "40'" }, { player: "Jaílson", minute: "43'" }, { player: "Cícero", minute: "74'" }], gremioRed: [],
+                opponentYellow: [{ player: "Acosta", minute: "24'" }, { player: "García Guerreño", minute: "40'" }, { player: "Maxi Velázquez", minute: "76'" }, { player: "Diego Braghieri", minute: "90+4'" }], opponentRed: [],
+                substitutions: [{ playerIn: "Everton", playerOut: "Fernandinho", minute: "58'" }, { playerIn: "Cícero", playerOut: "Jaílson", minute: "71'" }, { playerIn: "Jael", playerOut: "Lucas Barrios", minute: "74'" }],
+                startingXI: ["Marcelo Grohe", "Edílson", "Pedro Geromel", "Walter Kannemann", "Bruno Cortez", "Arthur", "Jaílson", "Ramiro", "Luan", "Lucas Barrios", "Fernandinho"],
+                suspendedForThisMatch: []
+            },
+            {
+                date: '29/11/2017', homeTeam: 'Lanús', awayTeam: 'Grêmio', score: '1 x 2', location: 'La Fortaleza (Lanús)', stage: 'Final', type: 'away',
+                gremioGoals: [{ player: "Fernandinho", minute: "26'" }, { player: "Luan", minute: "41'" }],
+                opponentGoals: [{ player: "José Sand", minute: "71' (pen)" }],
+                gremioYellow: [{ player: "Edílson", minute: "25'" }, { player: "Bruno Cortez", minute: "70'" }, { player: "Jaílson", minute: "70'" }, { player: "Ramiro", minute: "82'" }, { player: "Marcelo Grohe", minute: "90+1'" }], gremioRed: [{ player: "Ramiro", minute: "82'" }],
+                opponentYellow: [{ player: "García Guerreño", minute: "5'" }, { player: "Maxi Velázquez", minute: "20'" }, { player: "Alejandro Silva", minute: "70'" }], opponentRed: [],
+                substitutions: [{ playerIn: "Michel", playerOut: "Arthur", minute: "51'" }, { playerIn: "Cícero", playerOut: "Lucas Barrios", minute: "75'" }, { playerIn: "Thyere", playerOut: "Bressan", minute: "81'" }],
+                startingXI: ["Marcelo Grohe", "Edílson", "Pedro Geromel", "Walter Kannemann", "Bruno Cortez", "Arthur", "Jaílson", "Ramiro", "Luan", "Lucas Barrios", "Fernandinho"],
+                suspendedForThisMatch: []
+            }
+        ];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const tabs = document.querySelectorAll('.tab-button');
+            const tabPanes = document.querySelectorAll('.tab-pane');
+            const timelineContainer = document.getElementById('timeline');
+            const modal = document.getElementById('match-modal');
+            const closeModalBtn = document.getElementById('close-modal');
+            const modalTitle = document.getElementById('modal-title');
+            const modalSubtitle = document.getElementById('modal-subtitle');
+            const modalContent = document.getElementById('modal-content');
+
+            // Normalize player names for consistency (e.g., "Barrios" to "Lucas Barrios")
+            function normalizePlayerName(name) {
+                if (name === "Barrios") {
+                    return "Lucas Barrios";
+                }
+                return name;
+            }
+
+            // Apply normalization to all relevant data points
+            matchData.forEach(match => {
+                match.gremioGoals.forEach(goal => {
+                    goal.player = normalizePlayerName(goal.player);
+                });
+                match.gremioYellow.forEach(card => {
+                    card.player = normalizePlayerName(card.player);
+                });
+                match.gremioRed.forEach(card => {
+                    card.player = normalizePlayerName(card.player);
+                });
+                // Handle cases where gremioYellow or gremioRed might have empty player names
+                if (match.gremioYellow.length > 0 && !match.gremioYellow[0].player) {
+                    match.gremioYellow = []; // Clear if no player specified
+                }
+                if (match.gremioRed.length > 0 && !match.gremioRed[0].player) {
+                    match.gremioRed = []; // Clear if no player specified
+                }
+
+                match.substitutions.forEach(sub => {
+                    sub.playerIn = normalizePlayerName(sub.playerIn);
+                    sub.playerOut = normalizePlayerName(sub.playerOut);
+                });
+                match.startingXI = match.startingXI.map(player => normalizePlayerName(player));
+                match.suspendedForThisMatch = match.suspendedForThisMatch.map(player => normalizePlayerName(player));
+            });
+
+
+            function renderTimeline() {
+                timelineContainer.innerHTML = matchData.map((match, index) => {
+                    const isHome = match.type === 'home';
+                    const scoreParts = match.score.split('x').map(s => parseInt(s.trim()));
+                    const gremioScore = isHome ? scoreParts[0] : scoreParts[1];
+                    const oppScore = isHome ? scoreParts[1] : scoreParts[0];
+                    let resultColor = 'bg-gray-400';
+                    if (gremioScore > oppScore) resultColor = 'bg-green-500';
+                    else if (gremioScore < oppScore) resultColor = 'bg-red-500';
+
+                    return `
+                        <div class="flex items-center w-full" data-index="${index}">
+                            <div class="hidden md:block w-20 text-right mr-4">
+                                <p class="text-sm text-gray-500">${match.stage}</p>
+                            </div>
+                            <div class="w-8 h-8 rounded-full ${resultColor} flex-shrink-0"></div>
+                            <div class="flex-grow ml-4">
+                                <div data-index="${index}" class="bg-gray-50 hover:bg-blue-50 cursor-pointer p-4 rounded-lg shadow-sm transition-all duration-200">
+                                    <div class="flex justify-between items-center">
+                                        <div class="flex items-center">
+                                            <span class="font-semibold text-blue-900">${isHome ? 'Grêmio' : match.homeTeam}</span>
+                                            <span class="font-bold text-lg mx-3">${match.score}</span>
+                                            <span class="font-semibold text-gray-700">${isHome ? match.awayTeam : 'Grêmio'}</span>
+                                        </div>
+                                        <div class="text-right text-sm text-gray-500">
+                                            <p>${match.date}</p>
+                                            <p class="md:hidden mt-1">${match.stage}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+            
+            function openMatchModal(index) {
+                const match = matchData[index];
+                const isHome = match.type === 'home';
+                modalTitle.textContent = `${match.homeTeam} ${match.score} ${match.awayTeam}`;
+                modalSubtitle.textContent = `${match.stage} - ${match.date} - ${match.location}`;
+
+                const renderList = (items, title, icon, color) => {
+                    if (!items || items.length === 0) return '';
+                    return `
+                        <div>
+                            <h4 class="font-semibold text-gray-700 mb-2">${title}</h4>
+                            <ul class="list-disc list-inside text-gray-600 space-y-1">
+                                ${items.map(item => `<li><span class="font-semibold" style="color: ${color};">${item.player}</span> ${item.minute ? `(${item.minute})` : ''}</li>`).join('')}
+                            </ul>
+                        </div>
+                    `;
+                };
+
+                 const renderSubs = (items) => {
+                    if (!items || items.length === 0) return '';
+                     return `
+                        <div>
+                            <h4 class="font-semibold text-gray-700 mb-2">Substituições (Grêmio)</h4>
+                            <ul class="list-disc list-inside text-gray-600 space-y-1">
+                                ${items.map(item => `<li><span class="text-green-600 font-semibold">${item.playerIn}</span>  entrou no lugar de <span class="text-red-600">${item.playerOut}</span> (${item.minute})</li>`).join('')}
+                            </ul>
+                        </div>
+                    `;
+                };
+
+                // New function to render Starting XI
+                const renderStartingXI = (players) => {
+                    if (!players || players.length === 0) return '';
+                    return `
+                        <div>
+                            <h4 class="font-semibold text-gray-700 mb-2">Escalação Inicial (Grêmio)</h4>
+                            <ul class="list-disc list-inside text-gray-600 space-y-1 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-x-4">
+                                ${players.map(player => `<li>${player}</li>`).join('')}
+                            </ul>
+                        </div>
+                    `;
+                };
+
+
+                modalContent.innerHTML = `
+                    ${renderStartingXI(match.startingXI)}
+                    <hr class="my-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            ${renderList(match.gremioGoals, 'Gols do Grêmio', '⚽️', '#1e40af')}
+                            ${renderList(match.opponentGoals, `Gols do ${isHome ? match.awayTeam : match.homeTeam}`, '⚽️', '#4b5563')}
+                        </div>
+                        <div>
+                            ${renderList(match.gremioYellow, 'Cartões Amarelos (Grêmio)', '🟨', '#f59e0b')}
+                            ${renderList(match.gremioRed, 'Cartões Vermelhos (Grêmio)', '🟥', '#dc2626')}
+                            ${renderList(match.opponentYellow, `Cartões Amarelos (${isHome ? match.awayTeam : match.homeTeam})`, '🟨', '#f59e0b')}
+                            ${renderList(match.opponentRed, `Cartões Vermelhos (${isHome ? match.awayTeam : match.homeTeam})`, '🟥', '#dc2626')}
+                        </div>
+                    </div>
+                     ${match.substitutions.length > 0 ? '<hr class="my-4">' : ''}
+                     ${renderSubs(match.substitutions)}
+                `;
+
+                modal.classList.remove('hidden');
+            }
+
+            timelineContainer.addEventListener('click', (e) => {
+                const target = e.target.closest('[data-index]');
+                if (target) {
+                    openMatchModal(target.dataset.index);
+                }
+            });
+
+            closeModalBtn.addEventListener('click', () => modal.classList.add('hidden'));
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.classList.add('hidden');
+                }
+            });
+            
+            function renderScorers() {
+                const scorers = {};
+                matchData.forEach(match => {
+                    match.gremioGoals.forEach(goal => {
+                        scorers[goal.player] = (scorers[goal.player] || 0) + 1;
+                    });
+                });
+                
+                const sortedScorers = Object.entries(scorers).sort((a, b) => b[1] - a[1]);
+                const scorersList = document.getElementById('scorers-list');
+                scorersList.innerHTML = sortedScorers.map(([player, goals]) => `
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <p class="font-semibold text-lg text-blue-900">${player}</p>
+                        <p class="text-2xl font-bold text-amber-600">${goals} <span class="text-base font-normal text-gray-500">gols</span></p>
+                    </div>
+                `).join('');
+            }
+
+            function getPlayersData() {
+                const playerDetails = {}; // {playerName: { starts: [], subs: [], suspensions: [], totalMinutesPlayed: 0, yellowCards: [], redCards: [], matchesPlayed: [] }}
+                let currentSuspensions = new Set(); // Players suspended for the *next* match
+
+                // Initialize all known players to ensure they appear in the list, even if 0 minutes
+                const allPlayers = new Set();
+                matchData.forEach(match => {
+                    match.startingXI.forEach(p => allPlayers.add(p));
+                    match.substitutions.forEach(s => {
+                        allPlayers.add(s.playerIn);
+                        allPlayers.add(s.playerOut);
+                    });
+                    match.gremioGoals.forEach(g => allPlayers.add(g.player));
+                    match.gremioYellow.forEach(c => allPlayers.add(c.player));
+                    match.gremioRed.forEach(c => allPlayers.add(c.player));
+                });
+
+                allPlayers.forEach(player => {
+                    playerDetails[player] = { starts: [], subs: [], suspensions: [], totalMinutesPlayed: 0, yellowCards: [], redCards: [], matchesPlayed: [] };
+                });
+
+
+                matchData.forEach((match, index) => {
+                    const matchNumber = index + 1;
+                    const matchDisplay = `${match.homeTeam} ${match.score} ${match.awayTeam} (${match.date})`;
+
+                    // Determine players suspended for *this* match (from previous red cards)
+                    const playersSuspendedForCurrentMatch = Array.from(currentSuspensions);
+                    
+                    // Record suspensions in playerDetails
+                    playersSuspendedForCurrentMatch.forEach(player => {
+                        if (!playerDetails[player]) playerDetails[player] = { starts: [], subs: [], suspensions: [], totalMinutesPlayed: 0, yellowCards: [], redCards: [], matchesPlayed: [] };
+                        playerDetails[player].suspensions.push({ matchNumber, matchDisplay });
+                    });
+
+                    // Reset currentSuspensions for the next iteration (players who served their ban are now available)
+                    currentSuspensions.clear();
+
+                    // Process starters and their minutes
+                    match.startingXI.forEach(player => {
+                        if (!playersSuspendedForCurrentMatch.includes(player)) { // Player started and was not suspended
+                            if (!playerDetails[player]) playerDetails[player] = { starts: [], subs: [], suspensions: [], totalMinutesPlayed: 0, yellowCards: [], redCards: [], matchesPlayed: [] };
+                            playerDetails[player].starts.push({ matchNumber, matchDisplay });
+                            playerDetails[player].matchesPlayed.push({ type: 'Titular', matchNumber, matchDisplay });
+
+                            let minutesInMatch = 90;
+                            // Check if this starter was substituted out
+                            const subOut = match.substitutions.find(s => s.playerOut === player);
+                            if (subOut) {
+                                minutesInMatch = parseInt(subOut.minute.replace("'", ""));
+                            }
+                            playerDetails[player].totalMinutesPlayed += minutesInMatch;
+                        }
+                    });
+
+                    // Process substitutes (playerIn) and their minutes
+                    match.substitutions.forEach(sub => {
+                        if (!playersSuspendedForCurrentMatch.includes(sub.playerIn)) { // Player came in and was not suspended
+                            if (!playerDetails[sub.playerIn]) playerDetails[sub.playerIn] = { starts: [], subs: [], suspensions: [], totalMinutesPlayed: 0, yellowCards: [], redCards: [], matchesPlayed: [] };
+                            playerDetails[sub.playerIn].subs.push({ matchNumber, matchDisplay });
+                            playerDetails[sub.playerIn].matchesPlayed.push({ type: 'Reserva', matchNumber, matchDisplay });
+
+                            const entryMinute = parseInt(sub.minute.replace("'", ""));
+                            const minutesInMatch = 90 - entryMinute;
+                            playerDetails[sub.playerIn].totalMinutesPlayed += minutesInMatch;
+                        }
+                    });
+
+                    // Add cards
+                    match.gremioYellow.forEach(card => {
+                        if (!playerDetails[card.player]) playerDetails[card.player] = { starts: [], subs: [], suspensions: [], totalMinutesPlayed: 0, yellowCards: [], redCards: [], matchesPlayed: [] };
+                        playerDetails[card.player].yellowCards.push({ matchNumber, matchDisplay, minute: card.minute });
+                    });
+                    match.gremioRed.forEach(card => {
+                        if (!playerDetails[card.player]) playerDetails[card.player] = { starts: [], subs: [], suspensions: [], totalMinutesPlayed: 0, yellowCards: [], redCards: [], matchesPlayed: [] };
+                        playerDetails[card.player].redCards.push({ matchNumber, matchDisplay, minute: card.minute });
+                        currentSuspensions.add(card.player); // Player will be suspended for the next match
+                    });
+                });
+
+                return playerDetails;
+            }
+
+            function renderStartersAndSuspensions() {
+                const playerDetails = getPlayersData();
+                const startersContent = document.getElementById('titulares-content');
+                let html = `
+                    <h3 class="text-lg font-semibold text-center mb-4">Participação dos Jogadores</h3>
+                    <div class="overflow-x-auto mb-8">
+                        <table class="min-w-full bg-white rounded-lg shadow-md">
+                            <thead>
+                                <tr class="bg-blue-800 text-white">
+                                    <th class="py-3 px-4 text-left rounded-tl-lg">Jogador</th>
+                                    <th class="py-3 px-4 text-right">Partidas como Titular</th>
+                                    <th class="py-3 px-4 text-right rounded-tr-lg">Partidas como Reserva</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+
+                const allPlayers = Object.keys(playerDetails);
+                // Sort by 'Partidas como Titular' (starts.length) in descending order
+                const sortedPlayers = allPlayers.sort((a, b) => {
+                    const startsA = playerDetails[a].starts.length || 0;
+                    const startsB = playerDetails[b].starts.length || 0;
+                    return startsB - startsA;
+                });
+
+                sortedPlayers.forEach(player => {
+                    const starts = playerDetails[player].starts.length || 0;
+                    const subs = playerDetails[player].subs.length || 0;
+                    html += `
+                        <tr class="border-b border-gray-200 hover:bg-gray-50">
+                            <td class="py-3 px-4">
+                                <span class="player-name-link" data-player="${player}">${player}</span>
+                            </td>
+                            <td class="py-3 px-4 text-right font-medium">${starts}</td>
+                            <td class="py-3 px-4 text-right font-medium">${subs}</td>
+                        </tr>
+                    `;
+                });
+
+                html += `
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <h3 class="text-lg font-semibold text-center mt-8 mb-4">Suspensões por Cartão Vermelho</h3>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full bg-white rounded-lg shadow-md">
+                            <thead>
+                                <tr class="bg-red-700 text-white">
+                                    <th class="py-3 px-4 text-left rounded-tl-lg">Jogador</th>
+                                    <th class="py-3 px-4 text-left rounded-tr-lg">Partidas Suspenso (Número do Jogo)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+
+                const playersWithSuspensions = Object.keys(playerDetails).filter(player => playerDetails[player].suspensions.length > 0);
+                const sortedSuspensions = playersWithSuspensions.sort(); // Keep alphabetical for suspensions
+
+                if (sortedSuspensions.length === 0) {
+                    html += `
+                        <tr>
+                            <td colspan="2" class="py-3 px-4 text-center text-gray-500">Nenhum jogador suspenso por cartão vermelho registrado.</td>
+                        </tr>
+                    `;
+                } else {
+                    sortedSuspensions.forEach(player => {
+                        const suspendedMatches = playerDetails[player].suspensions.map(s => `Jogo ${s.matchNumber}`).join(', ');
+                        html += `
+                            <tr class="border-b border-gray-200 hover:bg-gray-50">
+                                <td class="py-3 px-4">
+                                    <span class="player-name-link" data-player="${player}">${player}</span>
+                                </td>
+                                <td class="py-3 px-4">${suspendedMatches}</td>
+                            </tr>
+                        `;
+                    });
+                }
+
+                html += `
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+
+                startersContent.innerHTML = html;
+
+                // Add event listeners to the new player name links
+                startersContent.querySelectorAll('.player-name-link').forEach(link => {
+                    link.addEventListener('click', (e) => {
+                        const playerName = e.target.dataset.player;
+                        openPlayerDetailModal(playerName);
+                    });
+                });
+            }
+
+            function renderMinutesPlayed() {
+                const playerDetails = getPlayersData();
+                const minutesPlayedContent = document.getElementById('minutos-jogados-content');
+                let html = `
+                    <h3 class="text-lg font-semibold text-center mb-4">Minutos Totais Jogados por Jogador</h3>
+                    <div class="overflow-x-auto mb-8">
+                        <table class="min-w-full bg-white rounded-lg shadow-md">
+                            <thead>
+                                <tr class="bg-blue-800 text-white">
+                                    <th class="py-3 px-4 text-left rounded-tl-lg">Jogador</th>
+                                    <th class="py-3 px-4 text-right rounded-tr-lg">Minutos Jogados</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+
+                const sortedPlayersByMinutes = Object.keys(playerDetails).sort((a, b) => {
+                    return playerDetails[b].totalMinutesPlayed - playerDetails[a].totalMinutesPlayed;
+                });
+
+                sortedPlayersByMinutes.forEach(player => {
+                    const minutes = playerDetails[player].totalMinutesPlayed;
+                    html += `
+                        <tr class="border-b border-gray-200 hover:bg-gray-50">
+                            <td class="py-3 px-4">
+                                <span class="player-name-link" data-player="${player}">${player}</span>
+                            </td>
+                            <td class="py-3 px-4 text-right font-medium">${minutes}</td>
+                        </tr>
+                    `;
+                });
+
+                html += `
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+                minutesPlayedContent.innerHTML = html;
+
+                // Add event listeners to the new player name links
+                minutesPlayedContent.querySelectorAll('.player-name-link').forEach(link => {
+                    link.addEventListener('click', (e) => {
+                        const playerName = e.target.dataset.player;
+                        openPlayerDetailModal(playerName);
+                    });
+                });
+            }
+
+            function renderCardsPerPlayer() {
+                const playerDetails = getPlayersData();
+                const cardsContent = document.getElementById('cartoes-jogador-content');
+                let html = `
+                    <h3 class="text-lg font-semibold text-center mb-4">Cartões por Jogador</h3>
+                    <div class="overflow-x-auto mb-8">
+                        <table class="min-w-full bg-white rounded-lg shadow-md">
+                            <thead>
+                                <tr class="bg-blue-800 text-white">
+                                    <th class="py-3 px-4 text-left rounded-tl-lg">Jogador</th>
+                                    <th class="py-3 px-4 text-right">Amarelos</th>
+                                    <th class="py-3 px-4 text-right rounded-tr-lg">Vermelhos</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+
+                const allPlayers = Object.keys(playerDetails);
+                // Sort by total cards (red + yellow) in descending order
+                const sortedPlayersByCards = allPlayers.sort((a, b) => {
+                    const totalCardsA = (playerDetails[a].yellowCards.length || 0) + (playerDetails[a].redCards.length || 0);
+                    const totalCardsB = (playerDetails[b].yellowCards.length || 0) + (playerDetails[b].redCards.length || 0);
+                    return totalCardsB - totalCardsA;
+                });
+
+                sortedPlayersByCards.forEach(player => {
+                    const yellowCards = playerDetails[player].yellowCards.length || 0;
+                    const redCards = playerDetails[player].redCards.length || 0;
+                    html += `
+                        <tr class="border-b border-gray-200 hover:bg-gray-50">
+                            <td class="py-3 px-4">
+                                <span class="player-name-link" data-player="${player}">${player}</span>
+                            </td>
+                            <td class="py-3 px-4 text-right font-medium">${yellowCards}</td>
+                            <td class="py-3 px-4 text-right font-medium">${redCards}</td>
+                        </tr>
+                    `;
+                });
+
+                html += `
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+                cardsContent.innerHTML = html;
+
+                // Add event listeners to the new player name links
+                cardsContent.querySelectorAll('.player-name-link').forEach(link => {
+                    link.addEventListener('click', (e) => {
+                        const playerName = e.target.dataset.player;
+                        openPlayerDetailModal(playerName);
+                    });
+                });
+            }
+
+
+            function openPlayerDetailModal(playerName) {
+                const playerDetails = getPlayersData()[playerName];
+
+                modalTitle.textContent = `Detalhes de Participação: ${playerName}`;
+                modalSubtitle.textContent = `Total de Minutos: ${playerDetails.totalMinutesPlayed || 0} | Partidas Jogadas: ${playerDetails.starts.length + playerDetails.subs.length}`;
+
+                let contentHtml = '';
+
+                if (playerDetails.starts.length > 0) {
+                    contentHtml += `
+                        <h4 class="font-semibold text-gray-700 mb-2">Partidas como Titular (${playerDetails.starts.length})</h4>
+                        <ul class="list-disc list-inside text-gray-600 space-y-1">
+                            ${playerDetails.starts.map(match => `<li>${match.matchDisplay}</li>`).join('')}
+                        </ul>
+                        <hr class="my-4">
+                    `;
+                }
+
+                if (playerDetails.subs.length > 0) {
+                    contentHtml += `
+                        <h4 class="font-semibold text-gray-700 mb-2">Partidas como Reserva (${playerDetails.subs.length})</h4>
+                        <ul class="list-disc list-inside text-gray-600 space-y-1">
+                            ${playerDetails.subs.map(match => `<li>${match.matchDisplay}</li>`).join('')}
+                        </ul>
+                        <hr class="my-4">
+                    `;
+                }
+
+                if (playerDetails.yellowCards.length > 0) {
+                    contentHtml += `
+                        <h4 class="font-semibold text-gray-700 mb-2 text-amber-600">Cartões Amarelos (${playerDetails.yellowCards.length})</h4>
+                        <ul class="list-disc list-inside text-gray-600 space-y-1">
+                            ${playerDetails.yellowCards.map(card => `<li>${card.matchDisplay} (${card.minute})</li>`).join('')}
+                        </ul>
+                        <hr class="my-4">
+                    `;
+                }
+
+                if (playerDetails.redCards.length > 0) {
+                    contentHtml += `
+                        <h4 class="font-semibold text-gray-700 mb-2 text-red-700">Cartões Vermelhos (${playerDetails.redCards.length})</h4>
+                        <ul class="list-disc list-inside text-gray-600 space-y-1">
+                            ${playerDetails.redCards.map(card => `<li>${card.matchDisplay} (${card.minute})</li>`).join('')}
+                        </ul>
+                        <hr class="my-4">
+                    `;
+                }
+
+                if (playerDetails.suspensions.length > 0) {
+                    contentHtml += `
+                        <h4 class="font-semibold text-gray-700 mb-2 text-red-700">Partidas Suspenso por Cartão Vermelho (${playerDetails.suspensions.length})</h4>
+                        <ul class="list-disc list-inside text-gray-600 space-y-1">
+                            ${playerDetails.suspensions.map(match => `<li>${match.matchDisplay}</li>`).join('')}
+                        </ul>
+                    `;
+                }
+
+                if (contentHtml === '') {
+                    contentHtml = `<p class="text-center text-gray-500">Nenhum dado de participação ou suspensão disponível para este jogador.</p>`;
+                }
+
+                modalContent.innerHTML = contentHtml;
+                modal.classList.remove('hidden');
+            }
+            
+            tabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    tabs.forEach(t => t.classList.remove('active'));
+                    tab.classList.add('active');
+                    
+                    const tabName = tab.dataset.tab;
+                    tabPanes.forEach(pane => {
+                        if (pane.id === `${tabName}-content`) {
+                            pane.classList.remove('hidden');
+                            if (tabName === 'titulares') {
+                                renderStartersAndSuspensions();
+                            } else if (tabName === 'minutos-jogados') {
+                                renderMinutesPlayed();
+                            } else if (tabName === 'cartoes-jogador') {
+                                renderCardsPerPlayer();
+                            }
+                        } else {
+                            pane.classList.add('hidden');
+                        }
+                    });
+                });
+            });
+
+            function createCharts() {
+                const homeData = { wins: 0, draws: 0, losses: 0 };
+                const awayData = { wins: 0, draws: 0, losses: 0 };
+                matchData.forEach(match => {
+                    const isHome = match.type === 'home';
+                    const scoreParts = match.score.split('x').map(s => parseInt(s.trim()));
+                    const gremioScore = isHome ? scoreParts[0] : scoreParts[1];
+                    const oppScore = isHome ? scoreParts[1] : scoreParts[0];
+                    const target = isHome ? homeData : awayData;
+                    if (gremioScore > oppScore) target.wins++;
+                    else if (gremioScore < oppScore) target.losses++;
+                    else target.draws++;
+                });
+
+                new Chart(document.getElementById('homeAwayChart'), {
+                    type: 'bar',
+                    data: {
+                        labels: ['Casa', 'Fora'],
+                        datasets: [
+                            { label: 'Vitórias', data: [homeData.wins, awayData.wins], backgroundColor: '#16a34a' },
+                            { label: 'Empates', data: [homeData.draws, awayData.draws], backgroundColor: '#6b7280' },
+                            { label: 'Derrotas', data: [homeData.losses, awayData.losses], backgroundColor: '#dc2626' },
+                        ]
+                    },
+                    options: { responsive: true, maintainAspectRatio: false, scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } } }
+                });
+
+                const goalsByStage = {
+                    'Fase de Grupos': { scored: 0, conceded: 0 },
+                    'Oitavas de Final': { scored: 0, conceded: 0 },
+                    'Quartas de Final': { scored: 0, conceded: 0 },
+                    'Semifinal': { scored: 0, conceded: 0 },
+                    'Final': { scored: 0, conceded: 0 },
+                };
+                matchData.forEach(match => {
+                    goalsByStage[match.stage].scored += match.gremioGoals.length;
+                    goalsByStage[match.stage].conceded += match.opponentGoals.length;
+                });
+                
+                new Chart(document.getElementById('goalsByStageChart'), {
+                    type: 'bar',
+                    data: {
+                        labels: Object.keys(goalsByStage),
+                        datasets: [
+                            { label: 'Gols Marcados', data: Object.values(goalsByStage).map(d => d.scored), backgroundColor: '#2563eb' },
+                            { label: 'Gols Sofridos', data: Object.values(goalsByStage).map(d => d.conceded), backgroundColor: '#ef4444' }
+                        ]
+                    },
+                    options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } }
+                });
+            }
+
+            renderTimeline();
+            renderScorers();
+            createCharts();
+        });
+    </script>
+</body>
+</html>
